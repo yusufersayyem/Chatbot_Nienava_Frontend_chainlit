@@ -29,8 +29,8 @@ async def on_message(message: cl.Message):
     target_url = f"{BACKEND_URL}/api/chat/stream"
     
     try:
-        # مهلة 120 ثانية لاستيعاب إستيقاظ السيرفر من وضع السكون
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        # رفع التايم أوت إلى 180 ثانية لمنع ReadTimeout نهائياً
+        async with httpx.AsyncClient(timeout=180.0) as client:
             async with client.stream("POST", target_url, json=payload) as response:
                 if response.status_code == 200:
                     async for chunk in response.aiter_text():
