@@ -1,52 +1,59 @@
 import os
-import chainlit as cl
+import json
 import httpx
-from dotenv import load_dotenv
+import chainlit as cl
 
-load_dotenv()
-
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
+# رابط الـ Backend الخاص بك على Render
+# قم باستبدال الرابط أدناه برابط الـ Backend الخاص بك
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://your-backend-name.onrender.com/api/chat")
 
 @cl.on_chat_start
-async def on_chat_start():
+async def start_chat():
+    # تهيئة سجل المحادثة
     cl.user_session.set("history", [])
-    await cl.Message(
-        content="المساعد الآلي للمديرية العامة لتربية نينوى .. قم بطرح أي سؤال أو استفسار لديك."
-    ).send()
+    await cl.Message(content="مرحباً بك! كيف يمكنني مساعدتك اليوم؟").send()
 
 @cl.on_message
-async def on_message(message: cl.Message):
+async def main(message: cl.Message):
     history = cl.user_session.get("history", [])
+
+    # تجهيز رسالة واجهة المستخدم لبث النتيجة فيها
     msg = cl.Message(content="")
     await msg.send()
-    
+
     payload = {
-        "question": message.content,
+        "message": message.content,
         "history": history
     }
-    
-    full_response = ""
-    target_url = f"{BACKEND_URL}/api/chat/stream"
-    
+
+    assistant_response = ""
+
     try:
-        async with httpx.AsyncClient(timeout=180.0) as client:
-            async with client.stream("POST", target_url, json=payload) as response:
-                if response.status_code == 200:
-                    async for chunk in response.aiter_text():
-                        if chunk:
-                            full_response += chunk
-                            await msg.stream_token(chunk)
-                else:
-                    full_response = f"⚠️ خطأ في الاتصال بالسيرفر (Status {response.status_code})"
-                    msg.content = full_response
-                    
+        # الاتصال بـ API الـ Backend واستقبال البث التدفقي (SSE)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream("POST", BACKEND_URL, json=payload) as response:
+                if response.status_code != 200:
+                    await msg.stream_token("حدث خطأ في الاتصال بالخادم الرئيسي.")
+                    return
+
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data_content = line.replace("data: ", "").strip()
+                        if data_content:
+                            try:
+                                token = json.loads(data_content)
+                                assistant_response += token
+                                await msg.stream_token(token)
+                            except json.JSONDecodeError:
+                                pass
+
         await msg.update()
-        
-        if response.status_code == 200 and full_response:
-            history.append({"role": "user", "content": message.content})
-            history.append({"role": "assistant", "content": full_response})
-            cl.user_session.set("history", history)
-            
+
+        # تحديث سجل المحادثة المحلي
+        history.append({"role": "user", "content": message.content})
+        history.append({"role": "assistant", "content": assistant_response})
+        cl.user_session.set("history", history)
+
     except Exception as e:
-        msg.content = f"⚠️ حدث خطأ أثناء الاتصال بالخلفية:\n`{type(e).__name__}: {str(e)}`"
+        msg.content = f"حدث خطأ أثناء الاتصال بالخادم: {str(e)}"
         await msg.update()
