@@ -4,7 +4,7 @@ import httpx
 import chainlit as cl
 
 # ضع رابط الـ Backend الخاص بك هنا بعد نشره
-BACKEND_URL = os.environ.get("BACKEND_URL", "https://your-backend-name.onrender.com/api/chat")
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://https://chatbot-nienava-backend-chainlit.onrender.com/api/chat")
 
 @cl.on_chat_start
 async def start_chat():
