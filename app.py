@@ -3,13 +3,11 @@ import json
 import httpx
 import chainlit as cl
 
-# رابط الـ Backend الخاص بك على Render
-# قم باستبدال الرابط أدناه برابط الـ Backend الخاص بك
-BACKEND_URL = os.environ.get("BACKEND_URL", "https://chatbot-nienava-backend-chainlit.onrender.com")
+# ضع رابط الـ Backend الخاص بك هنا بعد نشره
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://your-backend-name.onrender.com/api/chat")
 
 @cl.on_chat_start
 async def start_chat():
-    # تهيئة سجل المحادثة
     cl.user_session.set("history", [])
     await cl.Message(content="مرحباً بك! كيف يمكنني مساعدتك اليوم؟").send()
 
@@ -17,7 +15,6 @@ async def start_chat():
 async def main(message: cl.Message):
     history = cl.user_session.get("history", [])
 
-    # تجهيز رسالة واجهة المستخدم لبث النتيجة فيها
     msg = cl.Message(content="")
     await msg.send()
 
@@ -29,11 +26,10 @@ async def main(message: cl.Message):
     assistant_response = ""
 
     try:
-        # الاتصال بـ API الـ Backend واستقبال البث التدفقي (SSE)
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream("POST", BACKEND_URL, json=payload) as response:
                 if response.status_code != 200:
-                    await msg.stream_token("حدث خطأ في الاتصال بالخادم الرئيسي.")
+                    await msg.stream_token("حدث خطأ في الاتصال بالسيرفر الرئيسي.")
                     return
 
                 async for line in response.aiter_lines():
@@ -42,14 +38,14 @@ async def main(message: cl.Message):
                         if data_content:
                             try:
                                 token = json.loads(data_content)
-                                assistant_response += token
-                                await msg.stream_token(token)
                             except json.JSONDecodeError:
-                                pass
+                                token = data_content
+
+                            assistant_response += token
+                            await msg.stream_token(token)
 
         await msg.update()
 
-        # تحديث سجل المحادثة المحلي
         history.append({"role": "user", "content": message.content})
         history.append({"role": "assistant", "content": assistant_response})
         cl.user_session.set("history", history)
