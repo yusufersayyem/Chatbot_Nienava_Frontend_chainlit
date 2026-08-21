@@ -1,3 +1,2 @@
 chainlit
 httpx
-python-dotenv
