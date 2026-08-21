@@ -5,7 +5,7 @@ import chainlit as cl
 
 # رابط الـ Backend الخاص بك على Render
 # قم باستبدال الرابط أدناه برابط الـ Backend الخاص بك
-BACKEND_URL = os.environ.get("BACKEND_URL", "https://your-backend-name.onrender.com/api/chat")
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://chatbot-nienava-backend-chainlit.onrender.com")
 
 @cl.on_chat_start
 async def start_chat():
