@@ -1,30 +1,33 @@
 import os
-import httpx
 import chainlit as cl
+import httpx
+from httpx_sse import aconnect_sse
 
-# رابط الـ Backend (سيتم استبداله برابط Render بعد النشر)
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 @cl.on_message
 async def main(message: cl.Message):
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{BACKEND_URL}/search",
-                json={"query": message.content}
-            )
+    # إنشاء رسالة فارغة لبدء الكتابة فيها تدريجياً
+    msg = cl.Message(content="")
+    await msg.send()
 
-        if response.status_code == 200:
-            data = response.json()
-            answer = data.get("answer")
-            if answer:
-                await cl.Message(content=answer).send()
-            else:
-                await cl.Message(
-                    content="عذراً، هذه المعلومة غير متوفرة في قاعدة البيانات المتاحة لدي."
-                ).send()
-        else:
-            await cl.Message(content="حدث خطأ في الاستجابة من الخادم.").send()
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with aconnect_sse(
+                client, 
+                "POST", 
+                f"{BACKEND_URL}/search-stream", 
+                json={"query": message.content}
+            ) as event_source:
+                
+                async for event in event_source.aiter_sse():
+                    if event.data:
+                        # إرسال الكلمات تدريجياً للشاشة
+                        await msg.stream_token(event.data)
+
+        # إنهاء التدفّق وحفظ الرسالة النهائية
+        await msg.update()
 
     except Exception as e:
-        await cl.Message(content=f"حدث خطأ أثناء الاتصال بالنظام: {str(e)}").send()
+        msg.content = f"حدث خطأ أثناء الاتصال بالنظام: {str(e)}"
+        await msg.update()
