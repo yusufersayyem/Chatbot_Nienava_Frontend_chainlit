@@ -3,11 +3,12 @@ import chainlit as cl
 import httpx
 from httpx_sse import aconnect_sse
 
+# رابط الـ Backend
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 @cl.on_message
 async def main(message: cl.Message):
-    # إنشاء رسالة فارغة لبدء الكتابة فيها تدريجياً
+    # إنشاء رسالة فارغة لبدء ضخ الكلمات فيها تدريجياً
     msg = cl.Message(content="")
     await msg.send()
 
@@ -22,10 +23,10 @@ async def main(message: cl.Message):
                 
                 async for event in event_source.aiter_sse():
                     if event.data:
-                        # إرسال الكلمات تدريجياً للشاشة
+                        # عرض الكلمات تدريجياً (Streaming Effect)
                         await msg.stream_token(event.data)
 
-        # إنهاء التدفّق وحفظ الرسالة النهائية
+        # تحديث الرسالة كمنتهية بعد اكتمال النص
         await msg.update()
 
     except Exception as e:
