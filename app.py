@@ -8,7 +8,7 @@ BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 @cl.on_message
 async def main(message: cl.Message):
-    # إنشاء رسالة فارغة لبدء ضخ الكلمات فيها تدريجياً
+    # إنشاء رسالة فارغة لبدء ضخ الحروف فيها تدريجياً
     msg = cl.Message(content="")
     await msg.send()
 
@@ -23,10 +23,10 @@ async def main(message: cl.Message):
                 
                 async for event in event_source.aiter_sse():
                     if event.data:
-                        # عرض الكلمات تدريجياً (Streaming Effect)
+                        # عرض النص المتدفق تدريجياً (Streaming)
                         await msg.stream_token(event.data)
 
-        # تحديث الرسالة كمنتهية بعد اكتمال النص
+        # تحديث الرسالة بعد اكتمال النص بالكامل
         await msg.update()
 
     except Exception as e:
