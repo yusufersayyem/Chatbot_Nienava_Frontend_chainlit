@@ -14,17 +14,37 @@ async def main(message: cl.Message):
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            async with aconnect_sse(
-                client, 
-                "POST", 
-                f"{BACKEND_URL}/search-stream", 
+            # فحص الاستجابة أولاً لضمان حالة HTTP 200 ووجود ترويسة text/event-stream
+            async with client.stream(
+                "POST",
+                f"{BACKEND_URL}/search-stream",
                 json={"query": message.content}
-            ) as event_source:
-                
-                async for event in event_source.aiter_sse():
-                    if event.data:
-                        # عرض النص المتدفق تدريجياً (Streaming)
-                        await msg.stream_token(event.data)
+            ) as response:
+
+                if response.status_code != 200:
+                    await response.aread()
+                    msg.content = f"⚠️ خطأ من السيرفر (كود {response.status_code}):\n```\n{response.text}\n```"
+                    await msg.update()
+                    return
+
+                content_type = response.headers.get("content-type", "")
+                if "text/event-stream" not in content_type:
+                    await response.aread()
+                    msg.content = f"⚠️ استجابة غير متوافقة من السيرفر (ليست Stream):\n{response.text}"
+                    await msg.update()
+                    return
+
+                # ربط الاستجابة المؤكدة بـ aconnect_sse للمُعالجة التدريجية
+                async with aconnect_sse(
+                    client,
+                    "POST",
+                    f"{BACKEND_URL}/search-stream",
+                    json={"query": message.content}
+                ) as event_source:
+                    async for event in event_source.aiter_sse():
+                        if event.data:
+                            # عرض النص المتدفق تدريجياً (Streaming)
+                            await msg.stream_token(event.data)
 
         # تحديث الرسالة بعد اكتمال النص بالكامل
         await msg.update()
