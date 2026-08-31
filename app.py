@@ -6,6 +6,7 @@ from httpx_sse import aconnect_sse
 # رابط الـ Backend
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
+
 @cl.on_message
 async def main(message: cl.Message):
     # إنشاء رسالة فارغة لبدء ضخ الحروف فيها تدريجياً
@@ -13,13 +14,19 @@ async def main(message: cl.Message):
     await msg.send()
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            # فحص الاستجابة أولاً لضمان حالة HTTP 200 ووجود ترويسة text/event-stream
-            async with client.stream(
+        # زِدنا الـ timeout إلى 120 ثانية للتوافق مع استجابة نموذج التفكير (Reasoning)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+
+            # طلب واحد فقط لفتح اتصال SSE المباشر
+            async with aconnect_sse(
+                client,
                 "POST",
                 f"{BACKEND_URL}/search-stream",
-                json={"query": message.content}
-            ) as response:
+                json={"query": message.content},
+            ) as event_source:
+
+                # التحقق المباشر من نجاح الاتصال ووجود الترويسات المناسبة
+                response = event_source.response
 
                 if response.status_code != 200:
                     await response.aread()
@@ -34,21 +41,15 @@ async def main(message: cl.Message):
                     await msg.update()
                     return
 
-                # ربط الاستجابة المؤكدة بـ aconnect_sse للمُعالجة التدريجية
-                async with aconnect_sse(
-                    client,
-                    "POST",
-                    f"{BACKEND_URL}/search-stream",
-                    json={"query": message.content}
-                ) as event_source:
-                    async for event in event_source.aiter_sse():
-                        if event.data:
-                            # عرض النص المتدفق تدريجياً (Streaming)
-                            await msg.stream_token(event.data)
+                # قراءة البث المتدفق فوراً وبشكل فعال
+                async for event in event_source.aiter_sse():
+                    if event.data:
+                        # عرض النص المتدفق تدريجياً
+                        await msg.stream_token(event.data)
 
-        # تحديث الرسالة بعد اكتمال النص بالكامل
+        # تحديث الحالة النهائية عند اكتمال البث
         await msg.update()
 
     except Exception as e:
-        msg.content = f"حدث خطأ أثناء الاتصال بالنظام: {str(e)}"
+        msg.content = f"⚠️ حدث خطأ أثناء الاتصال بالنظام: {str(e)}"
         await msg.update()
