@@ -12,8 +12,8 @@ async def main(message: cl.Message):
     await msg.send()
 
     try:
-        # تقليل الـ timeout إلى 15 ثانية لأن البحث في FAISS سريع جداً
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        # رفع الـ timeout إلى 30 ثانية لضمان استقرار قراءة ملفات JSON
+        async with httpx.AsyncClient(timeout=30.0) as client:
             async with aconnect_sse(
                 client,
                 "POST",
