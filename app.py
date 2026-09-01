@@ -4,7 +4,7 @@ import httpx
 
 # رابط الباكإند على Render (يُقرأ تلقائياً من Environment Variables أو يوضع افتراضياً)
 BACKEND_URL = os.getenv(
-    "BACKEND_URL", "https://your-fastapi-app.onrender.com/search-stream"
+    "BACKEND_URL", "https://chatbot-nienava-backend-chainlit.onrender.com/search-stream"
 )
 
 
