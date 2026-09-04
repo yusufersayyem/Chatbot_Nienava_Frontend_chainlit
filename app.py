@@ -1,15 +1,17 @@
+import json
 import os
 import chainlit as cl
 import httpx
 
-# رابط الباك إند - يقرأ محلياً أو من متغيرات البيئة تلقائياً
+# رابط الباك إند - يقرأ من متغير البيئة على Render أو localhost للتطوير المحلي
 BACKEND_URL = os.getenv(
     "BACKEND_URL", "http://localhost:8000/search-stream"
 )
 
+
 @cl.on_chat_start
 async def on_chat_start():
-    """ارسال رسالة الترحيب عند فتح الشات."""
+    """إرسال رسالة الترحيب عند فتح الشات."""
     await cl.Message(
         content=(
             "مرحباً بك! 👋\n"
@@ -32,7 +34,8 @@ async def on_message(message: cl.Message):
     await msg.send()
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # زيادة Timeout لـ 90 ثانية لتفادي انقطاع الاتصال عند استيقاظ نموذج HF
+        async with httpx.AsyncClient(timeout=90.0) as client:
             async with client.stream(
                 "POST", BACKEND_URL, json={"query": user_query}
             ) as response:
@@ -47,15 +50,29 @@ async def on_message(message: cl.Message):
                 # استقبال البث التفاعلي للكلمات وتركيبها فورياً
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
-                        chunk = line.replace("data: ", "")
+                        raw_data = line.replace("data: ", "").strip()
 
-                        if chunk.strip() == "[DONE]":
+                        if raw_data == "[DONE]":
                             break
 
+                        # استخراج النص بدمج آمن يضمن عرض الأحرف العربية بدون تشويه
+                        chunk_text = raw_data
+                        try:
+                            parsed_json = json.loads(raw_data)
+                            if isinstance(parsed_json, dict) and "data" in parsed_json:
+                                chunk_text = parsed_json["data"]
+                            elif isinstance(parsed_json, str):
+                                chunk_text = parsed_json
+                        except json.JSONDecodeError:
+                            pass
+
                         # تحويل رموز السطر الجديد النصية إلى أسطر حقيقية
-                        formatted_chunk = chunk.replace("\\n", "\n")
+                        formatted_chunk = chunk_text.replace("\\n", "\n")
                         await msg.stream_token(formatted_chunk)
 
+    except httpx.ReadTimeout:
+        msg.content = "⏳ استغرق الخادم وقتاً أطول من المتوقع للاستجابة. يرجى إعادة المحاولة."
+        await msg.update()
     except Exception as e:
-        msg.content = f"❌ تعذر الاتصال ببرنامج الباكإند: {str(e)}"
+        msg.content = f"❌ تعذر الاتصال بالباك إند: {str(e)}"
         await msg.update()
