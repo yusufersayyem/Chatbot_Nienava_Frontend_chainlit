@@ -3,8 +3,11 @@ import os
 import chainlit as cl
 import httpx
 
-# رابط الباك إند - يقرأ من متغير البيئة على Render أو localhost للتطوير المحلي
-BACKEND_URL = os.getenv("BACKEND_URL", "https://chatbot-nienava-backend-chainlit.onrender.com/search-stream")
+# رابط الباك إند - يقرأ من متغير البيئة على Render أو المباشر للتطوير المحلي
+BACKEND_URL = os.getenv(
+    "BACKEND_URL",
+    "https://chatbot-nienava-backend-chainlit.onrender.com/search-stream"
+)
 
 
 @cl.on_chat_start
@@ -32,7 +35,7 @@ async def on_message(message: cl.Message):
     await msg.send()
 
     try:
-        # زيادة Timeout لـ 90 ثانية لتفادي انقطاع الاتصال عند استيقاظ نموذج HF
+        # زيادة Timeout إلى 90 ثانية لمنع انقطاع الاتصال عند استيقاظ سيرفر Render
         async with httpx.AsyncClient(timeout=90.0) as client:
             async with client.stream(
                 "POST", BACKEND_URL, json={"query": user_query}
@@ -47,14 +50,18 @@ async def on_message(message: cl.Message):
 
                 # استقبال البث التفاعلي للكلمات وتركيبها فورياً
                 async for line in response.aiter_lines():
+                    # تجاهل الأسطر الفارغة أو إشارات Keep-Alive (التي تبدأ بـ :)
+                    if not line or line.startswith(":"):
+                        continue
+
                     if line.startswith("data: "):
                         raw_data = line.replace("data: ", "").strip()
 
                         if raw_data == "[DONE]":
                             break
 
-                        # استخراج النص بدمج آمن يضمن عرض الأحرف العربية بدون تشويه
                         chunk_text = raw_data
+                        # فك تشفير JSON بأمان للاستخراج الصحيح للنص العربي
                         try:
                             parsed_json = json.loads(raw_data)
                             if isinstance(parsed_json, dict) and "data" in parsed_json:
