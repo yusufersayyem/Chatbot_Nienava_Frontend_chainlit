@@ -5,8 +5,7 @@ import httpx
 
 # رابط الباك إند - يقرأ من متغير البيئة على Render أو localhost للتطوير المحلي
 BACKEND_URL = os.getenv(
-    "BACKEND_URL", "https://chatbot-nienava-backend-chainlit.onrender.com"
-)
+    "BACKEND_URL", "https://chatbot-nienava-backend-chainlit.onrender.com/search-stream")
 
 
 @cl.on_chat_start
