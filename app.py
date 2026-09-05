@@ -5,7 +5,7 @@ import httpx
 
 # رابط الباك إند - يقرأ من متغير البيئة على Render أو يستخدم المحلي افتراضياً
 BACKEND_URL = os.getenv(
-    "BACKEND_URL", "http://localhost:8000/search-stream"
+    "BACKEND_URL", "https://chatbot-nienava-backend-chainlit.onrender.com/search-stream"
 )
 
 
