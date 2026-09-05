@@ -3,10 +3,9 @@ import os
 import chainlit as cl
 import httpx
 
-# رابط الباك إند - يقرأ من متغير البيئة على Render أو المباشر للتطوير المحلي
+# رابط الباك إند - يقرأ من متغير البيئة على Render أو يستخدم المحلي افتراضياً
 BACKEND_URL = os.getenv(
-    "BACKEND_URL",
-    "https://chatbot-nienava-backend-chainlit.onrender.com/search-stream"
+    "BACKEND_URL", "http://localhost:8000/search-stream"
 )
 
 
@@ -16,7 +15,7 @@ async def on_chat_start():
     await cl.Message(
         content=(
             "مرحباً بك! 👋\n"
-            "أنا مساعد البحث الدلالي الذكي لمديرية تربية نينوى.\n"
+            "أنا مساعد البحث المباشر في دليل تعليمات مديرية تربية نينوى.\n"
             "كيف يمكنني مساعدتك اليوم؟"
         )
     ).send()
@@ -42,9 +41,7 @@ async def on_message(message: cl.Message):
             ) as response:
 
                 if response.status_code != 200:
-                    msg.content = (
-                        f"⚠️ حدث خطأ أثناء الاتصال بالخادم الرئيسي (رمز: {response.status_code})."
-                    )
+                    msg.content = f"⚠️ حدث خطأ أثناء الاتصال بالخادم الرئيسي (رمز: {response.status_code})."
                     await msg.update()
                     return
 
@@ -64,7 +61,10 @@ async def on_message(message: cl.Message):
                         # فك تشفير JSON بأمان للاستخراج الصحيح للنص العربي
                         try:
                             parsed_json = json.loads(raw_data)
-                            if isinstance(parsed_json, dict) and "data" in parsed_json:
+                            if (
+                                isinstance(parsed_json, dict)
+                                and "data" in parsed_json
+                            ):
                                 chunk_text = parsed_json["data"]
                             elif isinstance(parsed_json, str):
                                 chunk_text = parsed_json
