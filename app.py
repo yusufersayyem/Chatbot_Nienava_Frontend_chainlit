@@ -1,25 +1,28 @@
+import os
+import requests
 import chainlit as cl
-import httpx
 
-# رابط خادم الـ Backend
-BACKEND_URL = "http://localhost:8000/predict"
+# رابط الـ Backend (سيتم استبداله برابط Render عند النشر)
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000/predict")
 
 @cl.on_message
 async def main(message: cl.Message):
     user_text = message.content
     
     try:
-        # إرسال طلب إلى الـ Backend
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(BACKEND_URL, json={"text": user_text})
+        # إرسال طلب للـ Backend
+        response = requests.post(
+            BACKEND_URL,
+            json={"text": user_text},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            bot_response = response.json().get("response")
+        else:
+            bot_response = "حدث خطأ أثناء الاتصال بالخادم."
             
-            if response.status_code == 200:
-                data = response.json()
-                reply = data.get("response")
-            else:
-                reply = "حدث خطأ أثناء التواصل مع خادم معالجة النصوص."
-                
-    except httpx.RequestError:
-        reply = "تعذر الاتصال بالـ Backend. تأكد من تشغيل الخادم."
+    except Exception as e:
+        bot_response = "تعذر الاتصال بالخادم. يرجى التحقق من تشغيل Backend."
 
-    await cl.Message(content=reply).send()
+    await cl.Message(content=bot_response).send()
